@@ -1,1 +1,27 @@
+name: Fetch Prix Carburants
 
+on:
+  schedule:
+    - cron: '0 * * * *'  # Every hour
+  workflow_dispatch:       # Manual trigger
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch prix carburants
+        run: |
+          curl -s "https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/records?limit=500&timezone=Europe/Paris" \
+            -H "Accept: application/json" \
+            -o data.json
+          echo "Fetched $(cat data.json | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('total_count','?'),'stations')")"
+
+      - name: Commit data
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add data.json
+          git diff --cached --quiet || git commit -m "Update prix carburants $(date -u '+%Y-%m-%d %H:%M')"
+          git push
