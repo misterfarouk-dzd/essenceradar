@@ -443,46 +443,43 @@ function loadStations(){
   setBnr('load','<span class="spin">⟳</span>&nbsp;Chargement des prix officiels…');
   const R=10,dLat=R/111,dLng=R/(111*Math.cos(ST.lat*Math.PI/180));
   const latMin=ST.lat-dLat,latMax=ST.lat+dLat,lngMin=ST.lng-dLng,lngMax=ST.lng+dLng;
-  // Build API URL with correct bbox
-  const laMn=Math.round(latMin*100000),laMx=Math.round(latMax*100000);
-  const lnMn=Math.round(lngMin*100000),lnMx=Math.round(lngMax*100000);
-  const dsId='prix-des-carburants-en-france-flux-instantane-v2';
-  const where=`latitude>${laMn} AND latitude<${laMx} AND longitude>${lnMn} AND longitude<${lnMx}`;
-  const apiBase=`https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/${dsId}/records?where=${encodeURIComponent(where)}&limit=100&timezone=Europe/Paris`;
-  
-  // Try direct then CORS proxies (corsproxy.io is most reliable)
-  const apis=[
-    apiBase,
-    `https://corsproxy.io/?${encodeURIComponent(apiBase)}`,
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(apiBase)}`,
-    `https://thingproxy.freeboard.io/fetch/${apiBase}`,
-  ];
-  tryAPIs(apis,0);
-}
-
-function tryAPIs(urls,idx){
-  if(idx>=urls.length){
-    ST.stations=demoStations();ST.upd=new Date();
-    setBnr('err','⚠️ API indisponible — données de démonstration');
-    afterLoad();return;
-  }
-  const label=['Direct','Proxy 1','Proxy 2','Proxy 3'][idx]||'Proxy';
-  setBnr('load',`<span class="spin">⟳</span>&nbsp;Tentative ${label}…`);
-  fetch(urls[idx],{headers:{'Accept':'application/json'}})
-    .then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
+  // Fetch from our own GitHub repo (updated hourly by GitHub Actions)
+  // This avoids ALL CORS issues since it's same-origin
+  const dataUrl='data.json';
+  setBnr('load','<span class="spin">⟳</span>&nbsp;Chargement des prix…');
+  fetch(dataUrl)
+    .then(r=>{if(!r.ok)throw new Error('data.json not found');return r.json();})
     .then(data=>{
-      // allorigins wraps in {contents:"..."}
-      if(data.contents&&typeof data.contents==='string'){
-        try{data=JSON.parse(data.contents);}catch(e){throw new Error('parse error');}
-      }
-      if(!data.results||!data.results.length)throw new Error('empty (total:'+data.total_count+')');
+      if(!data.results||!data.results.length)throw new Error('empty');
+      // Filter by distance client-side
       ST.stations=parseStations(data.results);
       ST.upd=new Date();
-      if(!ST.stations.length)throw new Error('no valid stations');
+      if(!ST.stations.length)throw new Error('no stations nearby');
       hideBnr();afterLoad();
     })
-    .catch(e=>{tryAPIs(urls,idx+1);});
+    .catch(e=>{
+      // Fallback to direct API
+      const laMn=Math.round(latMin*100000),laMx=Math.round(latMax*100000);
+      const lnMn=Math.round(lngMin*100000),lnMx=Math.round(lngMax*100000);
+      const where=`latitude>${laMn} AND latitude<${laMx} AND longitude>${lnMn} AND longitude<${lnMx}`;
+      const apiBase=`https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/records?where=${encodeURIComponent(where)}&limit=100`;
+      fetch(apiBase)
+        .then(r=>{if(!r.ok)throw new Error('API');return r.json();})
+        .then(data=>{
+          if(!data.results||!data.results.length)throw new Error('empty');
+          ST.stations=parseStations(data.results);
+          ST.upd=new Date();
+          hideBnr();afterLoad();
+        })
+        .catch(()=>{
+          ST.stations=demoStations();ST.upd=new Date();
+          setBnr('err','⚠️ Données de démo — lancez le workflow GitHub Actions');
+          afterLoad();
+        });
+    });
 }
+
+// tryAPIs removed - using data.json from GitHub Actions
 
 function parseStations(results){
   return results.map(r=>{
