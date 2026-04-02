@@ -1,4 +1,4 @@
-<!<!DOCTYPE html>
+<!DOCTYPE html>
 
 <html lang="fr">
 <head>
@@ -443,12 +443,12 @@ function loadStations(){
   setBnr('load','<span class="spin">⟳</span>&nbsp;Chargement des prix officiels…');
   const R=10,dLat=R/111,dLng=R/(111*Math.cos(ST.lat*Math.PI/180));
   const latMin=ST.lat-dLat,latMax=ST.lat+dLat,lngMin=ST.lng-dLng,lngMax=ST.lng+dLng;
-  // Try multiple API endpoints in order
+  const apiBase=`https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/records?where=latitude%3E${Math.round(latMin*100000)}%20AND%20latitude%3C${Math.round(latMax*100000)}%20AND%20longitude%3E${Math.round(lngMin*100000)}%20AND%20longitude%3C${Math.round(lngMax*100000)}&limit=100&timezone=Europe%2FParis`;
+  // Try direct, then via CORS proxies
   const apis=[
-    // Primary: data.economie.gouv.fr (v2)
-    `https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/records?where=latitude%3E${Math.round(latMin*100000)}%20AND%20latitude%3C${Math.round(latMax*100000)}%20AND%20longitude%3E${Math.round(lngMin*100000)}%20AND%20longitude%3C${Math.round(lngMax*100000)}&limit=100&timezone=Europe%2FParis`,
-    // Fallback: older endpoint
-    `https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/records?limit=100&refine=cp:91120&timezone=Europe%2FParis`,
+    apiBase,
+    `https://corsproxy.io/?${encodeURIComponent(apiBase)}`,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(apiBase)}`,
   ];
   tryAPIs(apis,0);
 }
