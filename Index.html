@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>EssenceRadar</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+:root{--bg:#080810;--s:#10101a;--s2:#18182a;--s3:#20203a;--b:#252540;--a:#00e5a0;--ad:rgba(0,229,160,.12);--a2:#ff6b35;--w:#ffd93d;--bl:#4d9fff;--t:#e8e8f2;--m:#60607a;--r:14px}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;font-family:'Syne',sans-serif;background:var(--bg);color:var(--t);overflow:hidden}
+#app{display:flex;flex-direction:column;height:100svh;max-width:430px;margin:0 auto;position:relative;overflow:hidden}
+.page{display:none;flex-direction:column;flex:1;overflow:hidden}
+.page.active{display:flex}
+.ps{flex:1;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;padding-bottom:80px}
+.ps::-webkit-scrollbar{display:none}
+
+/* HEADER */
+.hdr{padding:48px 20px 14px;background:linear-gradient(180deg,rgba(8,8,16,.98) 70%,transparent);flex-shrink:0;position:relative;z-index:10}
+.hdr-row{display:flex;align-items:center;justify-content:space-between}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-m{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(–a),#00b378);display:flex;align-items:center;justify-content:center;font-size:17px;box-shadow:0 0 18px rgba(0,229,160,.45)}
+.logo-n{font-size:19px;font-weight:800;letter-spacing:-.5px}
+.logo-n em{color:var(–a);font-style:normal}
+.hbtns{display:flex;gap:8px}
+.hbtn{width:36px;height:36px;border-radius:10px;background:var(–s);border:1px solid var(–b);display:flex;align-items:center;justify-content:center;font-size:15px;cursor:pointer;transition:.15s;position:relative}
+.hbtn:active{transform:scale(.88)}
+.ndot{position:absolute;top:6px;right:6px;width:7px;height:7px;border-radius:50%;background:var(–a2);border:1px solid var(–bg);display:none}
+
+/* LOC BAR */
+.lbar{margin-top:12px;display:flex;align-items:center;gap:8px;background:var(–s);border:1px solid var(–b);border-radius:11px;padding:9px 13px;cursor:pointer;transition:border-color .2s}
+.lbar:active{border-color:var(–a)}
+.lpulse{width:8px;height:8px;border-radius:50%;background:var(–a);flex-shrink:0;animation:blink 2s ease-in-out infinite}
+@keyframes blink{0%,100%{box-shadow:0 0 0 0 rgba(0,229,160,.5)}50%{box-shadow:0 0 0 6px rgba(0,229,160,0)}}
+.ltxt{flex:1;font-family:‘DM Mono’,monospace;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rtag{font-family:‘DM Mono’,monospace;font-size:11px;color:var(–a);background:var(–ad);padding:3px 9px;border-radius:20px;flex-shrink:0}
+
+/* CITY INPUT */
+#cityBar{display:flex;gap:8px;margin:8px 20px 0}
+#cityBar input{flex:1;background:var(–s2);border:1px solid var(–a);border-radius:10px;padding:9px 13px;color:var(–t);font-family:‘DM Mono’,monospace;font-size:13px;outline:none}
+#cityBar button{background:var(–a);color:#000;border:none;border-radius:10px;padding:9px 14px;font-family:‘Syne’,sans-serif;font-weight:800;font-size:13px;cursor:pointer;white-space:nowrap}
+
+/* FUEL TABS */
+.ftabs{display:flex;gap:7px;padding:12px 20px 0;overflow-x:auto;scrollbar-width:none;flex-shrink:0}
+.ftabs::-webkit-scrollbar{display:none}
+.ft{flex-shrink:0;padding:7px 15px;border-radius:30px;font-size:12px;font-weight:700;letter-spacing:.3px;cursor:pointer;border:1.5px solid var(–b);background:var(–s);color:var(–m);transition:.15s}
+.ft.on{background:var(–a);color:#000;border-color:var(–a);box-shadow:0 0 14px rgba(0,229,160,.3)}
+.ft:active{transform:scale(.92)}
+
+/* KPIs */
+.krow{display:flex;gap:10px;padding:14px 20px;flex-shrink:0}
+.kpi{flex:1;background:var(–s);border:1px solid var(–b);border-radius:var(–r);padding:13px;position:relative;overflow:hidden}
+.kpi::after{content:’’;position:absolute;top:0;left:0;right:0;height:2px}
+.kpi.k1::after{background:linear-gradient(90deg,var(–a),transparent)}
+.kpi.k2::after{background:linear-gradient(90deg,var(–w),transparent)}
+.kpi.k3::after{background:linear-gradient(90deg,var(–a2),transparent)}
+.kl{font-size:9px;text-transform:uppercase;letter-spacing:1.2px;color:var(–m);margin-bottom:5px}
+.kv{font-family:‘DM Mono’,monospace;font-size:21px;font-weight:500;line-height:1}
+.kpi.k1 .kv{color:var(–a)}.kpi.k2 .kv{color:var(–w)}.kpi.k3 .kv{color:var(–a2)}
+.ks{font-size:10px;color:var(–m);margin-top:4px}
+
+/* SORT */
+.srow{display:flex;gap:7px;padding:2px 20px 10px;overflow-x:auto;scrollbar-width:none;flex-shrink:0}
+.srow::-webkit-scrollbar{display:none}
+.sc{flex-shrink:0;padding:5px 12px;border-radius:20px;font-size:11px;border:1px solid var(–b);background:transparent;color:var(–m);cursor:pointer;transition:.15s}
+.sc.on{border-color:var(–a);color:var(–a)}
+
+/* BANNER */
+.banner{margin:0 20px 10px;border-radius:11px;padding:11px 13px;display:flex;align-items:center;gap:10px;font-size:12px;font-family:‘DM Mono’,monospace}
+.banner.load{background:rgba(77,159,255,.08);border:1px solid rgba(77,159,255,.2);color:var(–bl)}
+.banner.ok{background:rgba(0,229,160,.08);border:1px solid rgba(0,229,160,.2);color:var(–a)}
+.banner.err{background:rgba(255,107,53,.08);border:1px solid rgba(255,107,53,.2);color:var(–a2)}
+.spin{display:inline-block;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* STATION CARDS */
+.stns{padding:0 20px;display:flex;flex-direction:column;gap:10px}
+.scard{background:var(–s);border:1px solid var(–b);border-radius:var(–r);padding:14px;cursor:pointer;transition:.15s;position:relative;overflow:hidden}
+.scard.best{border-color:rgba(0,229,160,.35)}
+.scard.best::before{content:’’;position:absolute;inset:0;background:linear-gradient(135deg,rgba(0,229,160,.04),transparent);pointer-events:none}
+.scard:active{transform:scale(.975)}
+.crown{position:absolute;top:11px;right:11px;background:var(–a);color:#000;font-size:9px;font-weight:800;padding:3px 8px;border-radius:20px;letter-spacing:.5px;text-transform:uppercase}
+.stop{display:flex;gap:11px;align-items:flex-start}
+.sico{width:42px;height:42px;border-radius:11px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:19px;border:1px solid var(–b)}
+.snm{font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sadr{font-size:11px;color:var(–m);font-family:‘DM Mono’,monospace;margin-top:2px}
+.sbot{display:flex;align-items:center;justify-content:space-between;margin-top:12px;padding-top:12px;border-top:1px solid var(–b)}
+.pbig{font-family:‘DM Mono’,monospace;font-size:26px;font-weight:500;line-height:1}
+.pbig small{font-size:13px;color:var(–m)}
+.smeta{display:flex;flex-direction:column;align-items:flex-end;gap:5px}
+.dtag{font-size:11px;color:var(–m);font-family:‘DM Mono’,monospace}
+.otag{font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px}
+.otag.o{background:rgba(0,229,160,.15);color:var(–a)}
+.otag.c{background:rgba(255,107,53,.15);color:var(–a2)}
+.chips{display:flex;gap:6px;margin-top:9px;flex-wrap:wrap}
+.chip{font-size:10px;color:var(–m);padding:3px 8px;background:var(–s2);border-radius:7px}
+.chip.dn{color:var(–a)}
+.fbtn{position:absolute;bottom:12px;right:12px;font-size:16px;cursor:pointer;transition:.15s}
+.fbtn:active{transform:scale(.8)}
+
+/* MAP */
+#mapPage{position:relative}
+#map{flex:1;z-index:1}
+.mov{position:absolute;top:0;left:0;right:0;z-index:10;padding:48px 16px 12px;background:linear-gradient(180deg,rgba(8,8,16,.95) 60%,transparent);pointer-events:none}
+.mov>*{pointer-events:auto}
+.mtit{font-size:18px;font-weight:800;margin-bottom:10px}
+.mctrls{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none}
+.mctrls::-webkit-scrollbar{display:none}
+.mc{flex-shrink:0;padding:6px 13px;border-radius:20px;font-size:11px;font-weight:700;background:var(–s);border:1px solid var(–b);color:var(–m);cursor:pointer}
+.mc.on{background:var(–a);color:#000;border-color:var(–a)}
+.mleg{position:absolute;bottom:90px;left:16px;z-index:10;background:rgba(8,8,16,.88);border:1px solid var(–b);backdrop-filter:blur(10px);border-radius:11px;padding:10px 13px}
+.lr{display:flex;align-items:center;gap:7px;font-size:10px;color:var(–m);margin-bottom:5px;font-family:‘DM Mono’,monospace}
+.lr:last-child{margin-bottom:0}
+.ld{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+
+/* ALERTS */
+.ahdr{padding:48px 20px 16px}
+.atit{font-size:22px;font-weight:800}
+.asub{font-size:12px;color:var(–m);font-family:‘DM Mono’,monospace;margin-top:4px}
+.aform{margin:0 20px 20px;background:var(–s);border:1px solid var(–b);border-radius:var(–r);padding:16px}
+.aftit{font-size:13px;font-weight:700;margin-bottom:14px}
+.fr{margin-bottom:12px}
+.fl{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(–m);margin-bottom:6px}
+.fi{width:100%;background:var(–s2);border:1px solid var(–b);border-radius:9px;padding:10px 12px;color:var(–t);font-family:‘DM Mono’,monospace;font-size:13px;outline:none;transition:.15s}
+.fi:focus{border-color:var(–a)}
+select.fi option{background:var(–s2)}
+.frs{display:flex;gap:10px}
+.frs .fr{flex:1}
+.bcreate{width:100%;padding:12px;border-radius:11px;background:var(–a);color:#000;font-family:‘Syne’,sans-serif;font-size:14px;font-weight:800;border:none;cursor:pointer;transition:.15s}
+.bcreate:active{transform:scale(.96);opacity:.85}
+.slbl{padding:0 20px 10px;font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(–m)}
+.acards{padding:0 20px;display:flex;flex-direction:column;gap:10px}
+.acard{background:var(–s);border:1px solid var(–b);border-radius:var(–r);padding:14px;display:flex;gap:12px;align-items:flex-start;position:relative}
+.acard.trig{border-color:rgba(255,107,53,.4)}
+.acard.trig::before{content:’’;position:absolute;inset:0;border-radius:var(–r);background:linear-gradient(135deg,rgba(255,107,53,.05),transparent);pointer-events:none}
+.aico{font-size:22px;flex-shrink:0;margin-top:2px}
+.abody{flex:1;min-width:0}
+.atitle{font-size:14px;font-weight:700;margin-bottom:3px}
+.adesc{font-size:11px;color:var(–m);font-family:‘DM Mono’,monospace;line-height:1.5}
+.atag{font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;margin-top:7px;display:inline-block}
+.atag.act{background:rgba(0,229,160,.15);color:var(–a)}
+.atag.trig{background:rgba(255,107,53,.15);color:var(–a2)}
+.adel{font-size:16px;cursor:pointer;flex-shrink:0;transition:.15s}
+.adel:active{transform:scale(.8)}
+
+/* STATS */
+.sthdr{padding:48px 20px 16px}
+.sttit{font-size:22px;font-weight:800}
+.cc{margin:0 20px 14px;background:var(–s);border:1px solid var(–b);border-radius:var(–r);padding:16px;overflow:hidden}
+.ctit{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(–m);margin-bottom:14px}
+.spk{width:100%;height:70px}
+.spk svg{width:100%;height:100%}
+.splbls{display:flex;justify-content:space-between;margin-top:6px}
+.splbl{font-size:9px;color:var(–m);font-family:‘DM Mono’,monospace}
+.sgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 20px 14px}
+.ss{background:var(–s);border:1px solid var(–b);border-radius:var(–r);padding:14px}
+.ssl{font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(–m);margin-bottom:5px}
+.ssv{font-family:‘DM Mono’,monospace;font-size:20px;font-weight:500}
+.sss{font-size:10px;color:var(–m);margin-top:3px}
+.savc{margin:0 20px 14px;background:var(–s);border:1px solid rgba(0,229,160,.25);border-radius:var(–r);padding:16px;display:flex;gap:14px;align-items:center}
+.savi{font-size:36px}
+.savv{font-family:‘DM Mono’,monospace;font-size:28px;font-weight:500;color:var(–a)}
+.savd{font-size:12px;color:var(–m);margin-top:4px}
+
+/* DRAWER */
+.dov{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:500;opacity:0;pointer-events:none;transition:opacity .3s;backdrop-filter:blur(4px)}
+.dov.open{opacity:1;pointer-events:auto}
+.drw{position:fixed;bottom:0;left:50%;transform:translateX(-50%) translateY(100%);width:100%;max-width:430px;z-index:501;background:var(–s);border-radius:22px 22px 0 0;border:1px solid var(–b);border-bottom:none;transition:transform .35s cubic-bezier(.32,1,.22,1);max-height:92svh;display:flex;flex-direction:column;box-shadow:0 -8px 40px rgba(0,0,0,.5)}
+.drw.open{transform:translateX(-50%) translateY(0)}
+.dhdl{width:36px;height:4px;border-radius:2px;background:var(–b);margin:12px auto 0;flex-shrink:0}
+.dscr{overflow-y:auto;scrollbar-width:none;padding:0 20px 40px}
+.dscr::-webkit-scrollbar{display:none}
+.dhero{display:flex;align-items:center;gap:14px;padding:16px 0 14px;border-bottom:1px solid var(–b);margin-bottom:16px}
+.dico{width:54px;height:54px;border-radius:14px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:26px;border:1px solid var(–b);background:var(–s2)}
+.dnm{font-size:20px;font-weight:800;line-height:1.2}
+.dadr{font-size:12px;color:var(–m);font-family:‘DM Mono’,monospace;margin-top:3px}
+.dsr{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.dp{padding:5px 12px;border-radius:20px;font-size:11px;font-weight:700;display:flex;align-items:center;gap:5px}
+.dp.o{background:rgba(0,229,160,.15);color:var(–a)}
+.dp.c{background:rgba(255,107,53,.15);color:var(–a2)}
+.dp.d{background:var(–s2);color:var(–t);border:1px solid var(–b)}
+.dp.fv{background:rgba(255,100,130,.12);color:#ff6482;border:1px solid rgba(255,100,130,.2);cursor:pointer}
+.dsec{margin-bottom:18px}
+.dstit{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(–m);margin-bottom:10px}
+.pgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.pgc{background:var(–s2);border:1px solid var(–b);border-radius:11px;padding:11px;position:relative}
+.pgc.cf{border-color:rgba(0,229,160,.4)}
+.pgc.cf::before{content:’’;position:absolute;top:0;left:0;right:0;height:2px;background:var(–a);border-radius:11px 11px 0 0}
+.pgf{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(–m);margin-bottom:4px}
+.pgp{font-family:‘DM Mono’,monospace;font-size:18px;font-weight:500}
+.pgc.cf .pgp{color:var(–a)}
+.pgna{color:var(–m);font-size:13px}
+.itsec{margin-bottom:18px}
+.ittit{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(–m);margin-bottom:10px}
+.itbtns{display:flex;flex-direction:column;gap:9px}
+.itbtn{width:100%;padding:14px 16px;border-radius:13px;border:none;display:flex;align-items:center;gap:12px;cursor:pointer;transition:.15s;text-align:left;font-family:‘Syne’,sans-serif}
+.itbtn:active{transform:scale(.97);opacity:.85}
+.itbtn.ap{background:#000;border:1px solid #333}
+.itbtn.gm{background:#1a73e8}
+.itbtn.wz{background:#05c8f0}
+.itbico{font-size:22px;flex-shrink:0}
+.itbd{flex:1}
+.itbt{font-size:14px;font-weight:700;color:#fff}
+.itbtn.wz .itbt{color:#000}
+.itbs{font-size:11px;color:rgba(255,255,255,.6);margin-top:1px}
+.itbtn.wz .itbs{color:rgba(0,0,0,.5)}
+.itar{font-size:16px;color:rgba(255,255,255,.5)}
+.itbtn.wz .itar{color:rgba(0,0,0,.4)}
+.shbtn{width:100%;padding:13px;border-radius:13px;border:1px solid var(–b);background:var(–s2);color:var(–t);font-family:‘Syne’,sans-serif;font-size:14px;font-weight:700;cursor:pointer;transition:.15s;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:9px}
+.shbtn:active{transform:scale(.97)}
+.infob{background:var(–s2);border:1px solid var(–b);border-radius:11px;padding:13px;font-family:‘DM Mono’,monospace;font-size:12px;line-height:2;color:var(–m)}
+
+/* NAV */
+.bnav{flex-shrink:0;background:rgba(8,8,16,.94);backdrop-filter:blur(18px);border-top:1px solid var(–b);display:flex;padding:10px 0 26px;z-index:100}
+.ni{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;transition:.15s}
+.ni:active{transform:scale(.88)}
+.nico{font-size:21px}
+.nlbl{font-size:9px;font-family:‘DM Mono’,monospace;color:var(–m);letter-spacing:.5px}
+.ni.on .nlbl{color:var(–a)}
+.ni.on .nico{filter:drop-shadow(0 0 5px rgba(0,229,160,.7))}
+
+/* TOAST */
+.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(20px);background:var(–s2);border:1px solid var(–b);border-radius:11px;padding:10px 18px;font-size:12px;font-family:‘DM Mono’,monospace;white-space:nowrap;opacity:0;transition:.3s;z-index:999;pointer-events:none;max-width:90%}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* Leaflet */
+.leaflet-tile{filter:brightness(.4) saturate(.6) hue-rotate(200deg)}
+.leaflet-container{background:#08080f}
+.leaflet-control-zoom a{background:var(–s)!important;color:var(–t)!important;border-color:var(–b)!important}
+.leaflet-popup-content-wrapper{background:var(–s);border:1px solid var(–b);border-radius:12px}
+.leaflet-popup-content{color:var(–t);font-family:‘DM Mono’,monospace;font-size:12px}
+.leaflet-popup-tip{background:var(–s)}
+</style>
+
+</head>
+<body>
+<div id="app">
+
+<!-- PAGE PRIX -->
+
+<div class="page active" id="prixPage">
+  <div class="hdr">
+    <div class="hdr-row">
+      <div class="logo"><div class="logo-m">⛽</div><div class="logo-n">Essence<em>Radar</em></div></div>
+      <div class="hbtns">
+        <div class="hbtn" onclick="loadStations()">🔄</div>
+        <div class="hbtn" onclick="goPage('alertsPage','alertes')">🔔<div class="ndot" id="ndot"></div></div>
+      </div>
+    </div>
+    <div class="lbar" onclick="locateMe()">
+      <div class="lpulse"></div>
+      <div class="ltxt" id="ltxt">Obtention de la position…</div>
+      <div class="rtag">⊙ 10 km</div>
+    </div>
+    <div id="cityBar" style="display:none">
+      <input id="cityField" placeholder="Votre ville (ex: Palaiseau)" onkeydown="if(event.key==='Enter')geocodeCity()">
+      <button onclick="geocodeCity()">Chercher</button>
+    </div>
+  </div>
+
+  <div class="ftabs">
+    <div class="ft on" data-fuel="SP95" onclick="selFuel(this)">SP95</div>
+    <div class="ft" data-fuel="SP98" onclick="selFuel(this)">SP98</div>
+    <div class="ft" data-fuel="Gazole" onclick="selFuel(this)">Gazole</div>
+    <div class="ft" data-fuel="E10" onclick="selFuel(this)">E10</div>
+    <div class="ft" data-fuel="E85" onclick="selFuel(this)">E85</div>
+    <div class="ft" data-fuel="GPLc" onclick="selFuel(this)">GPL</div>
+  </div>
+
+  <div class="krow">
+    <div class="kpi k1"><div class="kl">Meilleur</div><div class="kv" id="kB">—</div><div class="ks" id="kBs">€/L</div></div>
+    <div class="kpi k2"><div class="kl">Moyenne</div><div class="kv" id="kA">—</div><div class="ks" id="kAs">€/L</div></div>
+    <div class="kpi k3"><div class="kl">Économie</div><div class="kv" id="kS">—</div><div class="ks">cts vs + cher</div></div>
+  </div>
+
+  <div class="ps">
+    <div id="bnr" class="banner" style="display:none"></div>
+    <div class="srow">
+      <div class="sc on" onclick="sortBy('prix',this)">↑ Prix</div>
+      <div class="sc" onclick="sortBy('dist',this)">📍 Distance</div>
+      <div class="sc" onclick="sortBy('nom',this)">🔤 Nom</div>
+    </div>
+    <div class="stns" id="stns"></div>
+  </div>
+</div>
+
+<!-- PAGE CARTE -->
+
+<div class="page" id="mapPage">
+  <div class="mov">
+    <div class="mtit">Carte du secteur</div>
+    <div class="mctrls">
+      <div class="mc on" onclick="fmap('all',this)">Toutes</div>
+      <div class="mc" onclick="fmap('cheap',this)">💚 Moins cher</div>
+      <div class="mc" onclick="fmap('open',this)">🕐 Ouvertes</div>
+    </div>
+  </div>
+  <div id="map"></div>
+  <div class="mleg">
+    <div class="lr"><div class="ld" style="background:#00e5a0"></div>Prix bas</div>
+    <div class="lr"><div class="ld" style="background:#ffd93d"></div>Prix moyen</div>
+    <div class="lr"><div class="ld" style="background:#ff6b35"></div>Prix élevé</div>
+    <div class="lr"><div class="ld" style="background:#4d9fff"></div>Vous êtes ici</div>
+  </div>
+</div>
+
+<!-- PAGE ALERTES -->
+
+<div class="page" id="alertsPage">
+  <div class="ps">
+    <div class="ahdr"><div class="atit">🔔 Alertes Prix</div><div class="asub">Notifié quand le prix baisse</div></div>
+    <div class="aform">
+      <div class="aftit">➕ Créer une alerte</div>
+      <div class="frs">
+        <div class="fr"><div class="fl">Carburant</div><select class="fi" id="aFuel"><option>SP95</option><option>SP98</option><option>Gazole</option><option>E10</option><option>E85</option><option>GPLc</option></select></div>
+        <div class="fr"><div class="fl">Prix seuil €/L</div><input class="fi" type="number" id="aPrice" step="0.01" placeholder="1.75" min="0.5" max="3"></div>
+      </div>
+      <div class="fr"><div class="fl">Station (optionnel)</div><select class="fi" id="aStation"><option value="">Toutes</option></select></div>
+      <button class="bcreate" onclick="createAlert()">Créer l'alerte</button>
+    </div>
+    <div class="slbl">Alertes actives</div>
+    <div class="acards" id="acards"></div>
+  </div>
+</div>
+
+<!-- PAGE STATS -->
+
+<div class="page" id="statsPage">
+  <div class="ps">
+    <div class="sthdr"><div class="sttit">📊 Statistiques</div></div>
+    <div class="cc">
+      <div class="ctit">Évolution SP95 — 14 jours</div>
+      <div class="spk">
+        <svg viewBox="0 0 340 70" preserveAspectRatio="none">
+          <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="rgba(0,229,160,.25)"/><stop offset="100%" stop-color="rgba(0,229,160,0)"/></linearGradient></defs>
+          <path fill="url(#g)" id="spkF"/><path fill="none" stroke="#00e5a0" stroke-width="2" id="spkL"/><g id="spkD"></g>
+        </svg>
+      </div>
+      <div class="splbls" id="spkLbls"></div>
+    </div>
+    <div class="savc"><div class="savi">💰</div><div><div class="savv" id="savV">—</div><div class="savd">économisés ce mois<br>en choisissant le moins cher</div></div></div>
+    <div class="sgrid">
+      <div class="ss"><div class="ssl">Stations</div><div class="ssv" id="stN">—</div><div class="sss">dans 10 km</div></div>
+      <div class="ss"><div class="ssl">Plein 50L</div><div class="ssv" id="stP">—</div><div class="sss">au meilleur prix</div></div>
+      <div class="ss"><div class="ssl">Dernière MAJ</div><div class="ssv" style="font-size:14px" id="stM">—</div><div class="sss">gouv.fr</div></div>
+      <div class="ss"><div class="ssl">Alertes</div><div class="ssv" id="stA">0</div><div class="sss">actives</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- DRAWER -->
+
+<div class="dov" id="dov" onclick="closeDrw()"></div>
+<div class="drw" id="drw"><div class="dhdl"></div><div class="dscr" id="dscr"></div></div>
+
+<!-- NAV -->
+
+<div class="bnav">
+  <div class="ni on" id="nav-prix" onclick="goPage('prixPage','prix')"><div class="nico">⛽</div><div class="nlbl">Prix</div></div>
+  <div class="ni" id="nav-carte" onclick="goPage('mapPage','carte')"><div class="nico">🗺️</div><div class="nlbl">Carte</div></div>
+  <div class="ni" id="nav-alertes" onclick="goPage('alertsPage','alertes')"><div class="nico">🔔</div><div class="nlbl">Alertes</div></div>
+  <div class="ni" id="nav-stats" onclick="goPage('statsPage','stats')"><div class="nico">📊</div><div class="nlbl">Stats</div></div>
+</div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const ST={lat:null,lng:null,fuel:'SP95',stations:[],filtered:[],alerts:[],map:null,mm:[],um:null,sort:'prix',upd:null};
+const BRANDS={'Leclerc':'🛒','Intermarché':'🟡','Carrefour':'🔵','Auchan':'🟠','Total':'🔴','TotalEnergies':'🔴','Shell':'🐚','BP':'💙','Esso':'🟢','Système U':'🟣','Casino':'🎲','Lidl':'🟤'};
+
+// NAV
+function goPage(id,nav){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.querySelectorAll('.ni').forEach(n=>n.classList.remove('on'));
+  const el=document.getElementById('nav-'+nav);if(el)el.classList.add('on');
+  if(id==='mapPage')initMap();
+  if(id==='statsPage')renderStats();
+}
+
+// LOCATION
+function locateMe(){
+  document.getElementById('ltxt').textContent='Localisation…';
+  if(!navigator.geolocation){showCityInput();return;}
+  navigator.geolocation.getCurrentPosition(
+    pos=>{ST.lat=pos.coords.latitude;ST.lng=pos.coords.longitude;revGeo();loadStations();},
+    err=>{console.warn('Geo error:',err.code,err.message);showCityInput();},
+    {timeout:10000,enableHighAccuracy:true}
+  );
+}
+
+function revGeo(){
+  // Use French government reverse geocoding API
+  fetch(`https://api-adresse.data.gouv.fr/reverse/?lon=${ST.lng}&lat=${ST.lat}`)
+    .then(r=>r.json()).then(d=>{
+      const f=d.features&&d.features[0];
+      if(f){
+        const p=f.properties;
+        document.getElementById('ltxt').textContent=[p.street||p.name,p.city||p.postcode].filter(Boolean).join(', ');
+      } else {
+        document.getElementById('ltxt').textContent=`${ST.lat.toFixed(4)}°N, ${ST.lng.toFixed(4)}°E`;
+      }
+    }).catch(()=>{document.getElementById('ltxt').textContent=`${ST.lat.toFixed(4)}°N, ${ST.lng.toFixed(4)}°E`;});
+}
+
+function showCityInput(){
+  document.getElementById('ltxt').innerHTML='<span style="color:var(--a2)">⚠️ Autoriser la position ou saisir une ville</span>';
+  document.getElementById('cityBar').style.display='flex';
+  setTimeout(()=>document.getElementById('cityField').focus(),100);
+}
+
+function geocodeCity(){
+  const city=document.getElementById('cityField').value.trim();
+  if(!city)return;
+  document.getElementById('ltxt').textContent='Recherche…';
+  // Use French government geocoding API (no CORS issues)
+  fetch(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(city)}&limit=1&type=municipality`)
+    .then(r=>r.json()).then(data=>{
+      if(!data.features||!data.features.length){
+        // fallback: try without type filter
+        return fetch(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(city)}&limit=1`)
+          .then(r=>r.json());
+      }
+      return data;
+    }).then(data=>{
+      const feat=data.features&&data.features[0];
+      if(!feat){showToast('❌ Ville non trouvée');document.getElementById('ltxt').textContent='Ville introuvable';return;}
+      ST.lng=feat.geometry.coordinates[0];
+      ST.lat=feat.geometry.coordinates[1];
+      const label=feat.properties.label||feat.properties.city||city;
+      document.getElementById('ltxt').textContent=label;
+      document.getElementById('cityBar').style.display='none';
+      loadStations();
+    }).catch(e=>{console.error('Geocode error:',e);showToast('❌ Erreur — vérifiez votre connexion');});
+}
+
+// API
+function loadStations(){
+  if(!ST.lat){showCityInput();return;}
+  setBnr('load','<span class="spin">⟳</span>&nbsp;Chargement des prix officiels…');
+  const R=10,dLat=R/111,dLng=R/(111*Math.cos(ST.lat*Math.PI/180));
+  const latMin=ST.lat-dLat,latMax=ST.lat+dLat,lngMin=ST.lng-dLng,lngMax=ST.lng+dLng;
+  const url=`https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/records?where=latitude%3E${Math.round(latMin*100000)}%20AND%20latitude%3C${Math.round(latMax*100000)}%20AND%20longitude%3E${Math.round(lngMin*100000)}%20AND%20longitude%3C${Math.round(lngMax*100000)}&limit=100&timezone=Europe%2FParis`;
+  fetch(url)
+    .then(r=>{if(!r.ok)throw new Error('API');return r.json();})
+    .then(data=>{
+      if(!data.results||!data.results.length)throw new Error('empty');
+      // Log first result to help debug
+      if(data.results[0])console.log('[ER] sample:',JSON.stringify(data.results[0]).slice(0,400));
+      ST.stations=parseStations(data.results);
+      ST.upd=new Date();
+      if(!ST.stations.length)throw new Error('no valid stations');
+      hideBnr();afterLoad();
+    })
+    .catch(e=>{
+      console.warn('[ER] API fail:',e);
+      ST.stations=demoStations();ST.upd=new Date();
+      setBnr('err','⚠️ Données de démo — API indisponible');
+      setTimeout(hideBnr,4000);afterLoad();
+    });
+}
+
+function parseStations(results){
+  return results.map(r=>{
+    // Parse prices — API uses prix_sp95, prix_gazole, etc.
+    const prices={};
+    const map={SP95:'sp95',SP98:'sp98',Gazole:'gazole',E10:'e10',E85:'e85',GPLc:'gplc'};
+    Object.entries(map).forEach(([k,v])=>{
+      let val=r['prix_'+v]||r['prix_'+v.toUpperCase()]||r[k]||null;
+      if(val!=null){
+        val=parseFloat(val);
+        // If >10, probably in centimes
+        if(val>10)val=val/100;
+        if(val>0.3&&val<4)prices[k]=val;
+      }
+    });
+    // Also try prix array
+    if(r.prix&&Array.isArray(r.prix)){
+      r.prix.forEach(p=>{
+        if(p.nom&&p.valeur){let v=parseFloat(p.valeur);if(v>10)v/=100;if(v>0.3&&v<4)prices[p.nom]=v;}
+      });
+    }
+
+    // Parse coords — multiple possible formats
+    let lat=0,lng=0;
+    if(r.geom){
+      if(r.geom.coordinates){lng=+r.geom.coordinates[0];lat=+r.geom.coordinates[1];}
+      else if(r.geom.lat){lat=+r.geom.lat;lng=+r.geom.lon||+r.geom.lng;}
+    }
+    if((!lat||!lng)&&r.latitude!=null){
+      const rlat=+r.latitude,rlng=+r.longitude;
+      // Auto-scale: France lat is ~43-51, lng is ~-5 to 10
+      lat=rlat>1000?rlat/100000:rlat;
+      lng=rlng>100||rlng<-10?rlng/100000:rlng;
+    }
+    if(lat<42||lat>52||lng<-6||lng>10){
+      console.warn('[ER] bad coords:',lat,lng,r.nom_enseigne);return null;
+    }
+    const dist=hdist(ST.lat,ST.lng,lat,lng);
+    const name=r.nom_enseigne||r.brand||'Station';
+    return{id:r.id||Math.random().toString(36).slice(2),name,lat,lng,dist,
+      address:`${r.adresse||''} ${r.ville||''}`.trim(),prices,
+      open:r.horaires_automate_24_24==='1'||r.automate_24_24==='1'||true,brand:name};
+  }).filter(s=>s&&s.lat&&s.lng&&s.dist<=11&&Object.keys(s.prices).length>0);
+}
+
+function demoStations(){
+  return[
+    {name:'E.Leclerc',address:'12 Av. des Arènes',dlat:.005,dlng:.008,prices:{SP95:1.799,SP98:1.849,Gazole:1.689,E10:1.749,E85:.799},open:true},
+    {name:'Intermarché',address:'22 Chemin des Vergers',dlat:-.009,dlng:.015,prices:{SP95:1.809,SP98:1.859,Gazole:1.699,E10:1.759,E85:.809},open:true},
+    {name:'TotalEnergies',address:'34 Bd du Maréchal',dlat:.018,dlng:-.012,prices:{SP95:1.839,SP98:1.889,Gazole:1.729,E10:1.789,GPLc:.889},open:true},
+    {name:'BP Station',address:'91 Route Nationale',dlat:-.025,dlng:.030,prices:{SP95:1.849,SP98:1.899,Gazole:1.739,E10:1.799},open:false},
+    {name:'Shell Express',address:'7 Rue de la Paix',dlat:.030,dlng:.022,prices:{SP95:1.919,SP98:1.969,Gazole:1.809,E10:1.869,GPLc:.929},open:true},
+    {name:'Système U',address:'5 Place du Marché',dlat:-.016,dlng:-.020,prices:{SP95:1.819,SP98:1.869,Gazole:1.709,E10:1.769,E85:.819},open:true},
+  ].map((s,i)=>({id:'d'+i,name:s.name,address:s.address,brand:s.name,
+    lat:ST.lat+s.dlat,lng:ST.lng+s.dlng,
+    dist:hdist(ST.lat,ST.lng,ST.lat+s.dlat,ST.lng+s.dlng),
+    prices:s.prices,open:s.open}));
+}
+
+function afterLoad(){fillAlertSelect();render();if(ST.map)updMap();}
+
+// RENDER
+function selFuel(el){
+  document.querySelectorAll('.ft').forEach(t=>t.classList.remove('on'));el.classList.add('on');
+  ST.fuel=el.dataset.fuel;render();
+}
+
+function render(){
+  const f=ST.fuel;
+  ST.filtered=ST.stations.filter(s=>s.prices[f]).sort((a,b)=>{
+    if(ST.sort==='prix')return a.prices[f]-b.prices[f];
+    if(ST.sort==='dist')return a.dist-b.dist;
+    return a.name.localeCompare(b.name);
+  });
+  if(!ST.filtered.length){
+    setBnr('err','⚠️ Aucune station pour ce carburant');
+    document.getElementById('stns').innerHTML='';
+    ['kB','kA','kS'].forEach(id=>document.getElementById(id).textContent='—');return;
+  }
+  const ps=ST.filtered.map(s=>s.prices[f]);
+  const best=Math.min(...ps),worst=Math.max(...ps),avg=ps.reduce((a,b)=>a+b,0)/ps.length;
+  document.getElementById('kB').textContent=fmt(best);
+  document.getElementById('kBs').textContent='€/L · '+ST.filtered[0].name;
+  document.getElementById('kA').textContent=fmt(avg);
+  document.getElementById('kAs').textContent=`€/L · ${ST.filtered.length} stations`;
+  document.getElementById('kS').textContent=((worst-best)*100).toFixed(1);
+  checkAlerts(best,f);
+  let favs=getFavs();
+  document.getElementById('stns').innerHTML=ST.filtered.map((s,i)=>{
+    const p=s.prices[f],iB=p===best,iE=p===worst;
+    const col=iB?'var(--a)':iE?'var(--a2)':'var(--t)';
+    const ico=BRANDS[s.name]||'⛽';
+    const dk=s.dist<1?`${(s.dist*1000).toFixed(0)} m`:`${s.dist.toFixed(1)} km`;
+    const mn=Math.round(s.dist/.5*6);
+    return`<div class="scard${iB?' best':''}" onclick="openDet('${s.id}')">
+      ${iB?'<div class="crown">🏆 Moins cher</div>':''}
+      <div class="stop"><div class="sico" style="background:rgba(255,255,255,.05)">${ico}</div>
+        <div><div class="snm">${s.name}</div><div class="sadr">${s.address}</div></div></div>
+      <div class="sbot">
+        <div class="pbig" style="color:${col}">${fmt(p)} <small>€/L</small></div>
+        <div class="smeta"><div class="dtag">📍 ${dk} · ~${mn} min</div>
+          <div class="otag ${s.open?'o':'c'}">${s.open?'Ouvert':'Fermé'}</div></div>
+      </div>
+      <div class="chips"><div class="chip dn">↓ MAJ aujourd'hui</div><div class="chip">${i===0?'🥇 N°1':'N°'+(i+1)}</div></div>
+      <div class="fbtn" onclick="event.stopPropagation();togFav('${s.id}',this)">${favs.has(s.id)?'❤️':'🤍'}</div>
+    </div>`;
+  }).join('');
+}
+
+function sortBy(m,el){document.querySelectorAll('.sc').forEach(c=>c.classList.remove('on'));el.classList.add('on');ST.sort=m;render();}
+function setBnr(t,h){const b=document.getElementById('bnr');b.style.display='flex';b.className='banner '+t;b.innerHTML=h;}
+function hideBnr(){document.getElementById('bnr').style.display='none';}
+
+// MAP
+let mapInited=false;
+function initMap(){
+  if(mapInited){updMap();return;}mapInited=true;
+  const lat=ST.lat||48.714,lng=ST.lng||2.245;
+  ST.map=L.map('map',{zoomControl:true,attributionControl:false}).setView([lat,lng],13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(ST.map);
+  updMap();
+}
+function updMap(){
+  const map=ST.map;if(!map)return;
+  ST.mm.forEach(m=>m.remove());ST.mm=[];if(ST.um)ST.um.remove();
+  if(ST.lat&&ST.lng){
+    ST.um=L.circleMarker([ST.lat,ST.lng],{radius:10,fillColor:'#4d9fff',color:'#fff',weight:2,fillOpacity:1}).addTo(map).bindPopup('<b>📍 Vous êtes ici</b>');
+    L.circle([ST.lat,ST.lng],{radius:10000,color:'rgba(77,159,255,0.3)',fillColor:'rgba(77,159,255,0.04)',weight:1}).addTo(map);
+    map.setView([ST.lat,ST.lng],13);
+  }
+  const f=ST.fuel,ps=ST.filtered.map(s=>s.prices[f]).filter(Boolean);
+  const mn=Math.min(...ps),mx=Math.max(...ps);
+  ST.filtered.forEach(s=>{
+    const p=s.prices[f];if(!p||!s.lat||!s.lng)return;
+    const r=mx===mn?.5:(p-mn)/(mx-mn);
+    const col=r<.33?'#00e5a0':r<.66?'#ffd93d':'#ff6b35';
+    const mk=L.circleMarker([s.lat,s.lng],{radius:14,fillColor:col,color:'#fff',weight:2,fillOpacity:.9}).addTo(map);
+    mk.bindPopup(`<b>${s.name}</b><br>${f}: <b style="color:${col}">${fmt(p)} €/L</b><br>📍 ${s.dist.toFixed(1)} km`);
+    ST.mm.push(mk);
+  });
+}
+function fmap(m,el){document.querySelectorAll('.mc').forEach(c=>c.classList.remove('on'));el.classList.add('on');showToast(m==='cheap'?'💚 Moins chères':m==='open'?'🕐 Ouvertes':'🗺️ Toutes');}
+
+// ALERTS
+function createAlert(){
+  const f=document.getElementById('aFuel').value;
+  const p=parseFloat(document.getElementById('aPrice').value);
+  if(!p||p<.5||p>3){showToast('❌ Prix invalide (0.50–3.00 €)');return;}
+  const sid=document.getElementById('aStation').value;
+  const st=sid?ST.stations.find(s=>s.id===sid):null;
+  ST.alerts.push({id:Date.now().toString(),fuel:f,price:p,stationId:sid,stationName:st?.name||'Toutes',active:true,triggered:false,created:new Date().toLocaleDateString('fr-FR')});
+  document.getElementById('aPrice').value='';
+  renderAlerts();updStatA();showToast(`✅ Alerte: ${f} < ${p.toFixed(2)} €/L`);
+}
+function renderAlerts(){
+  const c=document.getElementById('acards');
+  if(!ST.alerts.length){c.innerHTML='<div style="text-align:center;color:var(--m);font-family:DM Mono,monospace;font-size:12px;padding:30px">Aucune alerte</div>';document.getElementById('ndot').style.display='none';return;}
+  document.getElementById('ndot').style.display=ST.alerts.some(a=>a.triggered)?'block':'none';
+  c.innerHTML=ST.alerts.map(a=>`<div class="acard${a.triggered?' trig':''}">
+    <div class="aico">${a.triggered?'🚨':'🔔'}</div>
+    <div class="abody"><div class="atitle">${a.fuel} &lt; ${a.price.toFixed(2)} €/L</div>
+      <div class="adesc">Station: ${a.stationName}<br>Créée le ${a.created}</div>
+      <div class="atag ${a.triggered?'trig':'act'}">${a.triggered?'🚨 DÉCLENCHÉE':'✅ Active'}</div></div>
+    <div class="adel" onclick="delAlert('${a.id}')">🗑️</div>
+  </div>`).join('');
+}
+function delAlert(id){ST.alerts=ST.alerts.filter(a=>a.id!==id);renderAlerts();updStatA();showToast('🗑️ Alerte supprimée');}
+function checkAlerts(best,fuel){
+  let trig=false;
+  ST.alerts.forEach(a=>{if(a.fuel===fuel&&best<=a.price){a.triggered=true;trig=true;}});
+  if(trig)renderAlerts();
+}
+function fillAlertSelect(){
+  document.getElementById('aStation').innerHTML='<option value="">Toutes les stations</option>'+
+    ST.stations.map(s=>`<option value="${s.id}">${s.name} (${s.dist.toFixed(1)}km)</option>`).join('');
+}
+function updStatA(){document.getElementById('stA').textContent=ST.alerts.length;}
+
+// STATS
+function renderStats(){
+  const days=14,now=new Date();
+  const vals=Array.from({length:days},(_,i)=>+(1.78+Math.sin(i*.7)*.04+(Math.random()-.5)*.02).toFixed(3));
+  const lbls=Array.from({length:days},(_,i)=>{const d=new Date(now);d.setDate(d.getDate()-(days-1-i));return`${d.getDate()}/${d.getMonth()+1}`;});
+  const W=340,H=70,mn=Math.min(...vals),mx=Math.max(...vals);
+  const pts=vals.map((v,i)=>({x:i*(W/(days-1)),y:H-((v-mn)/(mx-mn||1))*(H-10)-5}));
+  const d=pts.map((p,i)=>(i===0?`M${p.x},${p.y}`:`L${p.x},${p.y}`)).join(' ');
+  document.getElementById('spkL').setAttribute('d',d);
+  document.getElementById('spkF').setAttribute('d',d+` L${pts[pts.length-1].x},${H} L0,${H} Z`);
+  document.getElementById('spkD').innerHTML=pts.map((p,i)=>`<circle cx="${p.x}" cy="${p.y}" r="${i===days-1?4:2}" fill="#00e5a0"/>`).join('');
+  document.getElementById('spkLbls').innerHTML=lbls.filter((_,i)=>i%4===0||i===days-1).map(l=>`<span class="splbl">${l}</span>`).join('');
+  const f=ST.fuel,ps=ST.stations.filter(s=>s.prices[f]).map(s=>s.prices[f]);
+  const best=ps.length?Math.min(...ps):null;
+  document.getElementById('stN').textContent=ST.stations.length||'—';
+  document.getElementById('stP').textContent=best?`${(best*50).toFixed(2)}€`:'—';
+  document.getElementById('stM').textContent=ST.upd?ST.upd.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}):'—';
+  document.getElementById('savV').textContent=best&&ps.length?`${((Math.max(...ps)-best)*50*12).toFixed(0)} €`:'—';
+  updStatA();
+}
+
+// DETAIL DRAWER
+function openDet(id){
+  const s=ST.stations.find(x=>x.id===id);if(!s)return;
+  const f=ST.fuel,ps=ST.filtered.map(s=>s.prices[f]).filter(Boolean);
+  const best=Math.min(...ps),p=s.prices[f],iB=p===best;
+  const ico=BRANDS[s.name]||'⛽';
+  const dk=s.dist<1?`${(s.dist*1000).toFixed(0)} m`:`${s.dist.toFixed(1)} km`;
+  const mn=Math.round(s.dist/.5*6);
+  const fv=getFavs().has(s.id);
+  const fuels=['SP95','SP98','Gazole','E10','E85','GPLc'];
+  const pg=fuels.map(fu=>{const v=s.prices[fu];return`<div class="pgc${fu===f?' cf':''}">
+    <div class="pgf">${fu}${fu===f?' ✦':''}</div>
+    ${v?`<div class="pgp">${fmt(v)} <span style="font-size:11px;color:var(--m)">€/L</span></div>`:`<div class="pgna">—</div>`}
+  </div>`;}).join('');
+  const aU=`maps://maps.apple.com/?daddr=${s.lat},${s.lng}&dirflg=d`;
+  const gU=`https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}&travelmode=driving`;
+  const wU=`https://waze.com/ul?ll=${s.lat},${s.lng}&navigate=yes`;
+  document.getElementById('dscr').innerHTML=`
+    <div class="dhero"><div class="dico">${ico}</div><div><div class="dnm">${s.name}</div><div class="dadr">📍 ${s.address}</div></div></div>
+    <div class="dsr">
+      <div class="dp ${s.open?'o':'c'}">${s.open?'🟢 Ouvert':'🔴 Fermé'}</div>
+      <div class="dp d">📍 ${dk} · ~${mn} min</div>
+      ${iB?'<div class="dp o">🏆 Moins cher</div>':''}
+      <div class="dp fv" id="dfv" onclick="togFavDrw('${s.id}')">${fv?'❤️ Favori':'🤍 Favori'}</div>
+    </div>
+    <div class="dsec"><div class="dstit">Prix disponibles</div><div class="pgrid">${pg}</div></div>
+    <div class="itsec">
+      <div class="ittit">Itinéraire</div>
+      <div class="itbtns">
+        <button class="itbtn ap" onclick="openNav('${aU}')"><div class="itbico">🍎</div><div class="itbd"><div class="itbt">Plans Apple</div><div class="itbs">Ouvre l'app Plans iPhone</div></div><div class="itar">›</div></button>
+        <button class="itbtn gm" onclick="openNav('${gU}')"><div class="itbico">🗺️</div><div class="itbd"><div class="itbt">Google Maps</div><div class="itbs">Navigation pas à pas</div></div><div class="itar">›</div></button>
+        <button class="itbtn wz" onclick="openNav('${wU}')"><div class="itbico">😎</div><div class="itbd"><div class="itbt" style="color:#000">Waze</div><div class="itbs" style="color:rgba(0,0,0,.5)">Trafic en temps réel</div></div><div class="itar" style="color:rgba(0,0,0,.4)">›</div></button>
+        <button class="shbtn" onclick="shareStn('${s.id}')">📤 Partager cette station</button>
+      </div>
+    </div>
+    <div class="dsec"><div class="dstit">Informations</div>
+      <div class="infob">Coords &nbsp;<span style="color:var(--t)">${s.lat.toFixed(5)}, ${s.lng.toFixed(5)}</span><br>Source &nbsp;&nbsp;<span style="color:var(--t)">prix-carburants.gouv.fr</span><br>MAJ &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--t)">${ST.upd?ST.upd.toLocaleString('fr-FR'):'Aujourd\'hui'}</span></div>
+    </div>`;
+  document.getElementById('dov').classList.add('open');
+  document.getElementById('drw').classList.add('open');
+}
+function closeDrw(){document.getElementById('dov').classList.remove('open');document.getElementById('drw').classList.remove('open');}
+function openNav(url){window.open(url,'_blank');}
+function shareStn(id){
+  const s=ST.stations.find(x=>x.id===id);if(!s)return;
+  const p=s.prices[ST.fuel];
+  const txt=`⛽ ${s.name} — ${ST.fuel} à ${fmt(p)} €/L\n📍 ${s.address}\n🗺️ https://maps.google.com/?q=${s.lat},${s.lng}`;
+  if(navigator.share)navigator.share({title:s.name,text:txt}).catch(()=>{});
+  else navigator.clipboard?.writeText(txt).then(()=>showToast('📋 Copié !'));
+}
+
+// FAVS
+function getFavs(){try{return new Set(JSON.parse(localStorage.getItem('favs')||'[]'));}catch{return new Set();}}
+function saveFavs(f){try{localStorage.setItem('favs',JSON.stringify([...f]));}catch{}}
+function togFav(id,el){const f=getFavs();if(f.has(id)){f.delete(id);el.textContent='🤍';showToast('💔 Retiré');}else{f.add(id);el.textContent='❤️';showToast('❤️ Favori ajouté');}saveFavs(f);}
+function togFavDrw(id){const el=document.getElementById('dfv');if(!el)return;const f=getFavs();if(f.has(id)){f.delete(id);el.textContent='🤍 Favori';showToast('💔 Retiré');}else{f.add(id);el.textContent='❤️ Favori';showToast('❤️ Ajouté');}saveFavs(f);}
+
+// UTILS
+function fmt(v){return v?v.toFixed(3).replace('.',','):'—';}
+function hdist(a,b,c,d){const R=6371,r=x=>x*Math.PI/180,dL=r(c-a),dG=r(d-b),q=Math.sin(dL/2)**2+Math.cos(r(a))*Math.cos(r(c))*Math.sin(dG/2)**2;return R*2*Math.atan2(Math.sqrt(q),Math.sqrt(1-q));}
+function showToast(m,dur=2200){const t=document.getElementById('toast');t.innerHTML=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),dur);}
+
+// BOOT
+renderAlerts();
+locateMe();
+</script>
+
+</body>
+</html>
