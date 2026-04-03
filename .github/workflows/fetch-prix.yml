@@ -2,8 +2,11 @@ name: Fetch Prix Carburants
 
 on:
   schedule:
-    - cron: '0 * * * *'  # Every hour
-  workflow_dispatch:       # Manual trigger
+    - cron: '0 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   fetch:
@@ -11,17 +14,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Fetch prix carburants
+      - name: Fetch data
         run: |
-          curl -s "https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/records?limit=500&timezone=Europe/Paris" \
-            -H "Accept: application/json" \
-            -o data.json
-          echo "Fetched $(cat data.json | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('total_count','?'),'stations')")"
+          curl -s "https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/records?limit=500&timezone=Europe/Paris" -o data.json
+          echo "Done: $(wc -c < data.json) bytes"
 
-      - name: Commit data
+      - name: Commit
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
           git add data.json
-          git diff --cached --quiet || git commit -m "Update prix carburants $(date -u '+%Y-%m-%d %H:%M')"
+          git diff --cached --quiet || git commit -m "Update data $(date -u '+%Y-%m-%d %H:%M')"
           git push
